@@ -18,14 +18,12 @@ try:
 except ImportError:
     REMBG_AVAILABLE = False
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 LOGGER = logging.getLogger("pibooth.background_changer")
 
 # Banner visibility settings
-BANNER_DISPLAY_TIME = 3.0  # Seconds to show banner before auto-hide
 _banner_last_shown = 0  # Timestamp when banner was last triggered
-_banner_visible = True  # Whether banner should be visible
 _thumbnail_cache = {}  # Cache for background thumbnails
 
 # Touch button areas (will be set by _draw_background_info)
@@ -534,23 +532,9 @@ def _get_background_thumbnail(bg_path, size=(80, 60)):
 
 
 def _show_banner():
-    """Show the banner and reset the timer."""
-    global _banner_last_shown, _banner_visible
+    """Show the banner (trigger redraw)."""
+    global _banner_last_shown
     _banner_last_shown = time.time()
-    _banner_visible = True
-
-
-def _should_show_banner():
-    """Check if banner should be visible based on timeout."""
-    global _banner_visible
-    if not _banner_visible:
-        return False
-
-    elapsed = time.time() - _banner_last_shown
-    if elapsed > BANNER_DISPLAY_TIME:
-        _banner_visible = False
-        return False
-    return True
 
 
 def _draw_background_info(win, bg_changer):
@@ -559,12 +543,6 @@ def _draw_background_info(win, bg_changer):
     global _left_button_rect, _right_button_rect
 
     if not bg_changer or not bg_changer.backgrounds:
-        return
-
-    # Check if banner should be visible
-    if not _should_show_banner():
-        _left_button_rect = None
-        _right_button_rect = None
         return
 
     # Get window surface
@@ -667,6 +645,7 @@ def state_wait_do(cfg, app, win, events):
     """Handle background selection during wait state.
 
     Uses left/right arrow keys or touch buttons to change background.
+    Consumes touch/click events on buttons so pibooth doesn't trigger a capture.
     """
     import pygame
     global _left_button_rect, _right_button_rect
@@ -674,43 +653,49 @@ def state_wait_do(cfg, app, win, events):
     if not hasattr(app, 'bg_changer') or app.bg_changer is None:
         return
 
-    # Check for left/right key events or touch/mouse clicks to change background
+    def _get_pos(event):
+        """Get event position in pixels, handling both mouse and finger events."""
+        if event.type in (pygame.FINGERDOWN, pygame.FINGERUP, pygame.FINGERMOTION):
+            display_size = win.surface.get_size()
+            return (event.x * display_size[0], event.y * display_size[1])
+        return event.pos
+
+    # Check for key events or touch/mouse clicks to change background
+    # Touch left half = previous, touch right half = next
+    # All touch events are consumed to prevent pibooth from triggering a capture
+    events_to_remove = []
+    screen_rect = win.surface.get_rect()
+
     for event in events:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 app.bg_changer.previous_background()
-                _show_banner()  # Show banner when changing background
+                _show_banner()
                 LOGGER.info("Background changed to: %s", app.bg_changer.get_current_background_name())
+                events_to_remove.append(event)
             elif event.key == pygame.K_RIGHT:
                 app.bg_changer.next_background()
-                _show_banner()  # Show banner when changing background
+                _show_banner()
                 LOGGER.info("Background changed to: %s", app.bg_changer.get_current_background_name())
+                events_to_remove.append(event)
 
-        # Handle touch/mouse clicks on buttons
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = event.pos
-
-            # Check if left button was clicked
-            if _left_button_rect and _left_button_rect.collidepoint(mouse_pos):
-                app.bg_changer.previous_background()
+        # Consume ALL touch/mouse events to prevent capture trigger
+        elif (event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP) and event.button in (1, 2, 3)) \
+                or event.type in (pygame.FINGERDOWN, pygame.FINGERUP):
+            # Change background on UP event (left half = previous, right half = next)
+            if event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
+                pos = _get_pos(event)
+                if pos[0] < screen_rect.width // 2:
+                    app.bg_changer.previous_background()
+                else:
+                    app.bg_changer.next_background()
                 _show_banner()
                 LOGGER.info("Touch: Background changed to: %s", app.bg_changer.get_current_background_name())
+            events_to_remove.append(event)
 
-            # Check if right button was clicked
-            elif _right_button_rect and _right_button_rect.collidepoint(mouse_pos):
-                app.bg_changer.next_background()
-                _show_banner()
-                LOGGER.info("Touch: Background changed to: %s", app.bg_changer.get_current_background_name())
-
-            # If clicked anywhere in banner area, show it again
-            else:
-                # Check if click is in the banner area (bottom-right, 15% larger)
-                rect = win.surface.get_rect()
-                box_width = 460  # Updated width
-                box_height = 104  # Updated height
-                banner_area = pygame.Rect(rect.width - box_width, rect.height - box_height, box_width, box_height)
-                if banner_area.collidepoint(mouse_pos):
-                    _show_banner()
+    # Remove consumed events so pibooth doesn't trigger a capture
+    for event in events_to_remove:
+        events.remove(event)
 
     # Draw background info overlay (will auto-hide after timeout)
     _draw_background_info(win, app.bg_changer)

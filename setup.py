@@ -5,12 +5,12 @@ from setuptools import setup
 
 setup(
     name='pibooth-background-changer',
-    version='1.0.0',
+    version='1.1.0',
     description='Pibooth plugin to remove and replace photo backgrounds using AI',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Christophe',
-    url='https://github.com/christophe/pibooth-background-changer',
+    url='https://github.com/ceeeeb/pibooth-background-changer',
     license='MIT',
     py_modules=['pibooth_background_changer'],
     python_requires='>=3.7',
