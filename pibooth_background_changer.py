@@ -18,7 +18,7 @@ try:
 except ImportError:
     REMBG_AVAILABLE = False
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 LOGGER = logging.getLogger("pibooth.background_changer")
 
@@ -38,33 +38,27 @@ SECTION = "BACKGROUND_CHANGER"
 
 
 def _detect_platform():
-    """Detect if running on Raspberry Pi and which model."""
-    pi_model = None
+    """Detect which machine pibooth is running on.
 
+    A device tree means a single board computer: an unrecognised one is
+    reported as embedded rather than as a desktop, because none of them has the
+    power to run the heavy models in a reasonable time.
+    """
     try:
         with open('/proc/device-tree/model', 'r') as f:
-            model = f.read()
-            if 'Raspberry Pi 5' in model:
-                pi_model = 'raspberry_pi_5'
-            elif 'Raspberry Pi 4' in model:
-                pi_model = 'raspberry_pi_4'
-            elif 'Raspberry Pi' in model:
-                pi_model = 'raspberry_pi'
-    except:
-        pass
+            model = f.read().replace('\0', '').strip()
+    except IOError:
+        return 'desktop'
 
-    if pi_model:
-        return pi_model
-
-    try:
-        with open('/proc/cpuinfo', 'r') as f:
-            cpuinfo = f.read()
-            if 'Raspberry Pi' in cpuinfo or 'BCM' in cpuinfo:
-                return 'raspberry_pi'
-    except:
-        pass
-
-    return 'desktop'
+    if 'Raspberry Pi 5' in model:
+        return 'raspberry_pi_5'
+    if 'Raspberry Pi 4' in model:
+        return 'raspberry_pi_4'
+    if 'Raspberry Pi' in model:
+        return 'raspberry_pi'
+    if 'Khadas VIM4' in model:
+        return 'khadas_vim4'
+    return 'embedded_board' if model else 'desktop'
 
 
 def _check_vulkan_support():
@@ -161,24 +155,17 @@ def _get_best_provider():
         return None
 
 
+# A single board computer has no ONNX acceleration: only silueta (~4MB) keeps up,
+# where the desktop model isnet-general-use (~176MB) needs tens of seconds per
+# picture. The split is embedded versus desktop, not Raspberry Pi versus others.
 def _get_recommended_model(platform):
     """Get recommended model based on platform capabilities."""
-    if 'raspberry_pi' in platform:
-        # Lighter models for Raspberry Pi (CPU)
-        # silueta is ~4MB and fast, decent quality for portraits
-        return 'silueta'
-    else:
-        # Better quality for desktop/GPU
-        return 'isnet-general-use'
+    return 'isnet-general-use' if platform == 'desktop' else 'silueta'
 
 
 def _get_recommended_resolution(platform):
     """Get recommended image resolution for processing."""
-    if 'raspberry_pi' in platform:
-        # Lower resolution for faster processing on Pi
-        return (640, 480)
-    else:
-        return (1280, 720)
+    return (1280, 720) if platform == 'desktop' else (640, 480)
 
 
 class BackgroundChanger:

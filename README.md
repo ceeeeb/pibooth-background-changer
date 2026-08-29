@@ -206,3 +206,17 @@ MIT License
 - [pibooth](https://github.com/pibooth/pibooth) - Framework photobooth
 - [rembg](https://github.com/danielgatis/rembg) - Suppression de fond par IA
 - [ONNX Runtime](https://onnxruntime.ai/) - Inférence optimisée
+
+## Boards
+
+The plugin picks its model from the machine it runs on, read from
+`/proc/device-tree/model`:
+
+| Platform | Model | Working resolution |
+|---|---|---|
+| Raspberry Pi, Khadas VIM4, any other board | `silueta` (~4 MB) | 640x480 |
+| Desktop | `isnet-general-use` (~176 MB) | 1280x720 |
+
+This only applies when `model = auto` is set in the configuration; an explicit
+model is always honoured. A board that is not listed above is still treated as
+embedded, never as a desktop, so it never ends up loading the heavy model.
