@@ -420,7 +420,7 @@ def pibooth_configure(cfg):
     cfg.add_option(
         SECTION,
         'model',
-        "u2net",
+        "auto",
         "AI model for background removal (auto, u2net, u2netp, u2net_human_seg, silueta)"
     )
     cfg.add_option(
