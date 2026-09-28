@@ -37,7 +37,7 @@ setup(
     install_requires=[
         'Pillow>=8.0.0',
         'pibooth>=2.0.0',
-        'rembg>=2.0.0',
+        'rembg[cpu]>=2.0.0',
     ],
     extras_require={'gpu': ['rembg[gpu]>=2.0.0']},
     zip_safe=False,
