@@ -287,15 +287,8 @@ class BackgroundChanger:
             image.save(img_byte_arr, format='PNG')
             img_byte_arr.seek(0)
 
-            # Remove background with improved edge detection
-            output = remove(
-                img_byte_arr.getvalue(),
-                session=self.session,
-                alpha_matting=True,
-                alpha_matting_foreground_threshold=270,
-                alpha_matting_background_threshold=20,
-                alpha_matting_erode_size=15
-            )
+            # No alpha matting: it takes minutes on a full resolution capture
+            output = remove(img_byte_arr.getvalue(), session=self.session)
 
             # Convert back to PIL Image
             result = Image.open(io.BytesIO(output))
