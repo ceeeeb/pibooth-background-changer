@@ -155,12 +155,18 @@ def _get_best_provider():
         return None
 
 
-# A single board computer has no ONNX acceleration: only silueta (~4MB) keeps up,
-# where the desktop model isnet-general-use (~176MB) needs tens of seconds per
-# picture. The split is embedded versus desktop, not Raspberry Pi versus others.
+# A single board computer has no ONNX acceleration. Measured on a Khadas VIM4
+# with a 3840x2160 capture: silueta 3.8 s, u2net_human_seg 4.2 s and
+# isnet-general-use 10 s. u2net_human_seg, trained on people, drops the halo
+# silueta leaves around hair and its staircase edges for almost the same time.
+# Slower boards keep silueta.
 def _get_recommended_model(platform):
     """Get recommended model based on platform capabilities."""
-    return 'isnet-general-use' if platform == 'desktop' else 'silueta'
+    if platform == 'desktop':
+        return 'isnet-general-use'
+    if platform == 'khadas_vim4':
+        return 'u2net_human_seg'
+    return 'silueta'
 
 
 def _get_recommended_resolution(platform):
@@ -421,7 +427,7 @@ def pibooth_configure(cfg):
         SECTION,
         'model',
         "auto",
-        "AI model for background removal (auto, u2net, u2netp, u2net_human_seg, silueta)"
+        "AI model for background removal (auto, u2net, u2netp, u2net_human_seg, silueta, isnet-general-use)"
     )
     cfg.add_option(
         SECTION,
